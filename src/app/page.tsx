@@ -42,20 +42,24 @@ export default function LandingPage() {
 								</li>
 							</ul>
 							<button
-								onClick={() =>
+								onClick={() => {
+									document.cookie =
+										'local-storage-mode=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 									signIn(undefined, {
 										callbackUrl: `${window.location.origin}/tracker`,
-									})
-								}
+									});
+								}}
 								className='w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors'>
 								Sign In / Sign Up
 							</button>
 							<button
-								onClick={() =>
+								onClick={() => {
+									document.cookie =
+										'local-storage-mode=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 									signIn('google', {
 										callbackUrl: `${window.location.origin}/tracker`,
-									})
-								}
+									});
+								}}
 								className='w-full mt-3 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-3'>
 								<svg className='w-5 h-5' viewBox='0 0 24 24'>
 									<path

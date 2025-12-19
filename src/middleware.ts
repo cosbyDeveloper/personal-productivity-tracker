@@ -6,46 +6,31 @@ export async function middleware(request: NextRequest) {
 		req: request,
 		secret: process.env.NEXTAUTH_SECRET,
 	});
+
 	const url = request.nextUrl.clone();
 	const searchParams = request.nextUrl.searchParams;
 
-	// Debug logging
-	console.log('Middleware triggered for:', request.nextUrl.pathname);
-	console.log('Token exists:', !!token);
+	// Debug logging - enhanced
+	console.log('=== MIDDLEWARE LOG ===');
+	console.log('Path:', request.nextUrl.pathname);
+	console.log('Has Auth Token:', !!token);
 	console.log('useLocalStorage param:', searchParams.get('useLocalStorage'));
 	console.log(
-		'Cookies:',
-		request.cookies
-			.getAll()
-			.map((c) => `${c.name}=${c.value}`)
-			.join(', '),
+		'All Cookies:',
+		request.cookies.getAll().map((c) => c.name),
 	);
+	console.log('======================');
 
-	// Check for explicit sign-out or mode change
-	const isExplicitSignOut = searchParams.get('signout') === 'true';
-	const isClearLocalStorage = searchParams.get('clearLocalStorage') === 'true';
-
-	// Handle landing page access
+	// Handle landing page access - CHECK AUTH FIRST!
 	if (request.nextUrl.pathname === '/') {
-		// If user explicitly wants to sign out or clear local storage
-		if (isExplicitSignOut || isClearLocalStorage) {
-			console.log('Explicit sign out requested, clearing cookies');
-			const response = NextResponse.next();
-			// Clear the local storage mode cookie
-			response.cookies.delete('local-storage-mode');
-			// Also delete from request headers to prevent immediate redirect
-			response.headers.set('x-clear-local-storage', 'true');
-			return response;
-		}
-
-		// Check if user is authenticated (has token)
+		// 1. FIRST: Check if user is authenticated (highest priority)
 		if (token) {
 			console.log('User authenticated, redirecting to /tracker');
 			url.pathname = '/tracker';
 			return NextResponse.redirect(url);
 		}
 
-		// Check for localStorage mode via URL parameter (user clicked "Use Local Storage")
+		// 2. Check for localStorage mode via URL parameter
 		if (searchParams.get('useLocalStorage') === 'true') {
 			console.log('Local storage mode requested, redirecting to /tracker');
 			url.pathname = '/tracker';
@@ -53,57 +38,54 @@ export async function middleware(request: NextRequest) {
 			return NextResponse.redirect(url);
 		}
 
-		// Check for localStorage mode via cookie - BUT allow access to landing page
-		// so user can see the landing page even if they previously used local storage
+		// 3. Check for localStorage mode via cookie (lowest priority)
 		const localStorageMode = request.cookies.get('local-storage-mode');
 		if (localStorageMode?.value === 'true') {
 			console.log(
-				'Local storage mode active, but allowing landing page access',
+				'Local storage mode cookie exists, but user is not authenticated',
 			);
-			// User can still see the landing page to choose options
-			return NextResponse.next();
+			// We could clear it here if we want
+			const response = NextResponse.next();
+			response.cookies.delete('local-storage-mode');
+			return response;
 		}
 
 		// Allow access to landing page
-		console.log('Showing landing page');
+		console.log('No auth or localStorage mode - showing landing page');
 		return NextResponse.next();
 	}
 
 	// Handle tracker page access control
 	if (request.nextUrl.pathname === '/tracker') {
-		// Check for localStorage mode via URL parameter (highest priority)
+		// 1. Check for localStorage mode via URL parameter (highest priority)
 		if (searchParams.get('useLocalStorage') === 'true') {
 			console.log('Local storage mode via URL param, allowing access');
-			// Set a cookie to remember local storage mode
 			const response = NextResponse.next();
 			response.cookies.set('local-storage-mode', 'true', {
-				maxAge: 60 * 60 * 24 * 30, // 30 days
+				maxAge: 60 * 60 * 24 * 30,
 				path: '/',
 				httpOnly: true,
 			});
 			return response;
 		}
 
-		// Check for localStorage mode via cookie
+		// 2. Check if user is authenticated
+		if (token) {
+			console.log('User authenticated, allowing access');
+			return NextResponse.next();
+		}
+
+		// 3. Check for localStorage mode via cookie (lowest priority)
 		const localStorageMode = request.cookies.get('local-storage-mode');
 		if (localStorageMode?.value === 'true') {
 			console.log('Local storage mode via cookie, allowing access');
 			return NextResponse.next();
 		}
 
-		// Check if user is authenticated (has token)
-		if (token) {
-			console.log('User authenticated, allowing access');
-			return NextResponse.next();
-		}
-
 		// User is not authenticated AND hasn't chosen local storage mode
 		console.log('Unauthorized access to /tracker, redirecting to /');
 		url.pathname = '/';
-		// Clear any stale cookies
-		const response = NextResponse.redirect(url);
-		response.cookies.delete('local-storage-mode');
-		return response;
+		return NextResponse.redirect(url);
 	}
 
 	// Protect API routes that require authentication
@@ -111,7 +93,6 @@ export async function middleware(request: NextRequest) {
 		request.nextUrl.pathname.startsWith('/api/time-entries') &&
 		!request.nextUrl.pathname.startsWith('/api/auth/')
 	) {
-		// Check for query parameter to allow local storage mode
 		if (searchParams.get('useLocalStorage') === 'true') {
 			return NextResponse.next();
 		}
@@ -131,11 +112,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-	matcher: [
-		// Handle landing page and tracker routing
-		'/',
-		'/tracker',
-		// Protect API routes except auth
-		'/api/((?!auth).*)',
-	],
+	matcher: ['/', '/tracker', '/api/((?!auth).*)'],
 };
