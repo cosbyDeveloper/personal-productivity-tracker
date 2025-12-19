@@ -4,6 +4,7 @@ import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 
 export default function LandingPage() {
+	// Simple landing page - middleware handles all redirect logic
 	return (
 		<div className='min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4'>
 			<div className='max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8'>
@@ -89,6 +90,10 @@ export default function LandingPage() {
 									<span className='text-green-500'>✓</span> Private to this
 									device
 								</li>
+								<li className='flex items-center gap-2'>
+									<span className='text-green-500'>✓</span> Data persists
+									locally
+								</li>
 							</ul>
 							<Link
 								href='/tracker?useLocalStorage=true'
@@ -102,8 +107,8 @@ export default function LandingPage() {
 					</div>
 
 					<p className='text-gray-500 text-sm'>
-						You can switch between modes anytime. Local storage and cloud data
-						merging is not yet supported.
+						You can switch between modes anytime. Your local data is always
+						preserved.
 					</p>
 				</div>
 			</div>

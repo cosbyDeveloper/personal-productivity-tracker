@@ -77,15 +77,10 @@ export const authOptions: NextAuthOptions = {
 	],
 	session: {
 		strategy: 'jwt',
-		maxAge: 30 * 24 * 60 * 60, // 30 days
+		maxAge: 24 * 60 * 60, // 1 day
 	},
-	pages: {
-		signIn: '/auth/signin',
-		signOut: '/auth/signout',
-		error: '/auth/error',
-		verifyRequest: '/auth/verify-request',
-		newUser: '/auth/new-user',
-	},
+	secret: process.env.NEXTAUTH_SECRET,
+	debug: process.env.NODE_ENV === 'development',
 	callbacks: {
 		async jwt({ token, user }) {
 			if (user) {
@@ -100,16 +95,23 @@ export const authOptions: NextAuthOptions = {
 			}
 			return session;
 		},
-		async redirect({ url, baseUrl }) {
-			// Allows relative callback URLs
-			if (url.startsWith('/')) return `${baseUrl}${url}`;
-			// Allows callback URLs on the same origin
-			else if (new URL(url).origin === baseUrl) return url;
-			return baseUrl;
+	},
+	pages: {
+		signIn: '/auth/signin',
+		signOut: '/auth/signout',
+	},
+	// Use secure cookies in production
+	cookies: {
+		sessionToken: {
+			name: `next-auth.session-token`,
+			options: {
+				httpOnly: true,
+				sameSite: 'lax',
+				path: '/',
+				secure: process.env.NODE_ENV === 'production',
+			},
 		},
 	},
-	secret: process.env.NEXTAUTH_SECRET,
-	debug: process.env.NODE_ENV === 'development',
 };
 
 const handler = NextAuth(authOptions);

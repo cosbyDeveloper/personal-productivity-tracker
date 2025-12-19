@@ -20,7 +20,7 @@ A Personal Web App for tracking productive hours with smart daily targets.
 - Shadcn UI
 - NextAuth.js
 - Google OAuth
-- next-pwa
+- MongoDB
 
 ## Installation
 

@@ -37,6 +37,7 @@ export default function TrackerPage() {
 	const [toast, setToast] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [useLocalStorageMode, setUseLocalStorageMode] = useState(false);
+	const [hasLocalData, setHasLocalData] = useState(false);
 	const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
 	const todayKey = formatDateKey(selectedDate);
@@ -44,14 +45,24 @@ export default function TrackerPage() {
 	useEffect(() => {
 		// Check if user wants to use local storage only
 		const searchParams = new URLSearchParams(window.location.search);
-		if (searchParams.get('useLocalStorage') === 'true') {
-			setUseLocalStorageMode(true);
-			window.history.replaceState({}, '', '/tracker?useLocalStorage=true');
-		}
+		const isLocalStorageMode = searchParams.get('useLocalStorage') === 'true';
 
-		// Check if we need to clear session
-		if (searchParams.get('clearSession') === 'true') {
-			window.history.replaceState({}, '', '/');
+		if (isLocalStorageMode) {
+			setUseLocalStorageMode(true);
+			// Set the localStorage flag for the app
+			if (typeof window !== 'undefined') {
+				localStorage.setItem('time-tracker-local-storage-mode', 'true');
+			}
+			// Clean URL by removing the parameter
+			window.history.replaceState({}, '', '/tracker');
+		} else {
+			// Check if localStorage mode is already set
+			if (typeof window !== 'undefined') {
+				const savedMode = localStorage.getItem(
+					'time-tracker-local-storage-mode',
+				);
+				setUseLocalStorageMode(savedMode === 'true');
+			}
 		}
 	}, []);
 
@@ -81,6 +92,11 @@ export default function TrackerPage() {
 
 				setHistory(savedHistory);
 
+				// Check if we have local data
+				const hasData =
+					Object.keys(savedHistory).length > 0 || Boolean(savedTimerState);
+				setHasLocalData(hasData);
+
 				if (savedTimerState && savedTimerState.running) {
 					const elapsedSeconds = Math.floor(
 						(Date.now() - savedTimerState.startTime!) / 1000,
@@ -106,6 +122,7 @@ export default function TrackerPage() {
 				console.error('Error loading initial data:', error);
 				setHistory({});
 				setSecondsToday(0);
+				setHasLocalData(false);
 			} finally {
 				console.log('Initial data loaded');
 				setIsLoading(false);
@@ -161,6 +178,73 @@ export default function TrackerPage() {
 		if (intervalRef.current) {
 			clearInterval(intervalRef.current);
 			intervalRef.current = null;
+		}
+	};
+
+	// Handle switching to cloud mode
+	const handleSwitchToCloud = async () => {
+		// Clear only the local storage mode settings, NOT the data
+		if (typeof window !== 'undefined') {
+			// Clear localStorage flag
+			localStorage.removeItem('time-tracker-local-storage-mode');
+
+			// Clear the local storage mode cookie
+			document.cookie =
+				'local-storage-mode=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+		}
+
+		setUseLocalStorageMode(false);
+
+		// Redirect to sign in with timestamp to prevent caching
+		await signIn(undefined, {
+			callbackUrl: `/tracker?ts=${Date.now()}`,
+			redirect: true,
+		});
+	};
+
+	// Handle sign out for authenticated users
+	const handleSignOut = async () => {
+		// Use NextAuth signOut with proper callback and timestamp
+		await signOut({
+			callbackUrl: '/?signout=true&ts=' + Date.now(),
+			redirect: true,
+		});
+	};
+
+	// Handle local storage mode sign out
+	const handleLocalStorageSignOut = () => {
+		if (
+			window.confirm(
+				'Are you sure you want to leave local storage mode? You can come back anytime and your data will still be here.',
+			)
+		) {
+			// Clear only the mode indicators, NOT the data
+			if (typeof window !== 'undefined') {
+				// Clear localStorage mode flag
+				localStorage.removeItem('time-tracker-local-storage-mode');
+
+				// Clear the local storage mode cookie
+				document.cookie =
+					'local-storage-mode=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+			}
+
+			setUseLocalStorageMode(false);
+
+			// Redirect to landing page with timestamp
+			window.location.href = '/?mode=cleared&ts=' + Date.now();
+		}
+	};
+
+	// Handle "exit to landing" for data-only mode
+	const handleExitToLanding = () => {
+		window.location.href = '/';
+	};
+
+	// Handle "use local storage mode" for data-only mode
+	const handleUseLocalStorageMode = () => {
+		if (typeof window !== 'undefined') {
+			localStorage.setItem('time-tracker-local-storage-mode', 'true');
+			setUseLocalStorageMode(true);
 		}
 	};
 
@@ -237,10 +321,16 @@ export default function TrackerPage() {
 		{},
 	);
 
+	// Determine which mode indicator to show
+	const showLocalStorageIndicator = useLocalStorageMode;
+	const showDataOnlyIndicator =
+		!session && !useLocalStorageMode && hasLocalData;
+	const showAuthenticatedIndicator = session;
+
 	// Loading state
 	if (status === 'loading' || isLoading) {
 		return (
-			<div className='min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50'>
+			<div className='min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50'>
 				<div className='text-center'>
 					<div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4'></div>
 					<p className='text-gray-600'>Loading your productivity data...</p>
@@ -254,16 +344,9 @@ export default function TrackerPage() {
 		);
 	}
 
-	// // Show auth page only if NOT in local storage mode AND no session
-	// const shouldShowAuthPage = !useLocalStorageMode && !session;
-
-	// if (shouldShowAuthPage) {
-	// 	return <LandingPage />;
-	// }
-
 	// Main app UI - shown for both authenticated users AND local storage users
 	return (
-		<main className='min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 md:p-8'>
+		<main className='min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 md:p-8'>
 			<div className='max-w-7xl mx-auto'>
 				{/* Toast Notification */}
 				{toast && (
@@ -273,7 +356,7 @@ export default function TrackerPage() {
 				)}
 
 				{/* User info - Only show if authenticated */}
-				{session && (
+				{showAuthenticatedIndicator && (
 					<div className='mb-6 p-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl shadow-sm flex items-center justify-between'>
 						<div className='flex items-center gap-3'>
 							{session.user?.image ? (
@@ -283,7 +366,7 @@ export default function TrackerPage() {
 									className='w-10 h-10 rounded-full'
 								/>
 							) : (
-								<div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg'>
+								<div className='w-10 h-10 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg'>
 									{session.user?.name?.[0] || session.user?.email?.[0] || 'U'}
 								</div>
 							)}
@@ -298,12 +381,7 @@ export default function TrackerPage() {
 							</div>
 						</div>
 						<button
-							onClick={() => {
-								signOut({
-									callbackUrl: '/',
-									redirect: true,
-								});
-							}}
+							onClick={handleSignOut}
 							className='text-sm text-gray-600 hover:text-gray-900 font-medium px-3 py-1.5 hover:bg-gray-100 rounded-lg transition-colors'>
 							Sign out
 						</button>
@@ -311,7 +389,7 @@ export default function TrackerPage() {
 				)}
 
 				{/* Local storage mode indicator */}
-				{useLocalStorageMode && (
+				{showLocalStorageIndicator && (
 					<div className='mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl shadow-sm flex items-center justify-between'>
 						<div className='flex items-center gap-3'>
 							<div className='w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center'>
@@ -323,21 +401,62 @@ export default function TrackerPage() {
 								</p>
 								<p className='text-xs text-gray-600'>
 									Your data is stored only on this device.
-									<span
-										className='ml-1 text-blue-600 hover:text-blue-800 cursor-pointer'
-										onClick={() =>
-											signIn(undefined, { callbackUrl: '/tracker' })
-										}>
+									<button
+										onClick={handleSwitchToCloud}
+										className='ml-1 text-blue-600 hover:text-blue-800 cursor-pointer'>
 										Sign in to enable cloud sync
-									</span>
+									</button>
 								</p>
 							</div>
 						</div>
-						<button
-							onClick={() => signIn(undefined, { callbackUrl: '/tracker' })}
-							className='text-sm text-gray-600 hover:text-gray-900 font-medium px-3 py-1.5 hover:bg-gray-100 rounded-lg transition-colors'>
-							Switch to Cloud Mode
-						</button>
+						<div className='flex gap-2'>
+							<button
+								onClick={handleSwitchToCloud}
+								className='text-sm text-gray-600 hover:text-gray-900 font-medium px-3 py-1.5 hover:bg-gray-100 rounded-lg transition-colors'>
+								Switch to Cloud
+							</button>
+							<button
+								onClick={handleLocalStorageSignOut}
+								className='text-sm text-red-600 hover:text-red-800 font-medium px-3 py-1.5 hover:bg-red-50 rounded-lg transition-colors'>
+								Exit Mode
+							</button>
+						</div>
+					</div>
+				)}
+
+				{/* Data-only mode indicator (has data but no explicit mode) */}
+				{showDataOnlyIndicator && (
+					<div className='mb-6 p-4 bg-gray-50 border border-gray-200 rounded-xl shadow-sm flex items-center justify-between'>
+						<div className='flex items-center gap-3'>
+							<div className='w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center'>
+								<span className='text-xl text-gray-800'>📊</span>
+							</div>
+							<div>
+								<p className='font-semibold text-gray-900'>
+									Local Data Detected
+								</p>
+								<p className='text-xs text-gray-600'>
+									You have local tracking data. Choose how to continue:
+								</p>
+							</div>
+						</div>
+						<div className='flex gap-2'>
+							<button
+								onClick={handleUseLocalStorageMode}
+								className='text-sm text-gray-600 hover:text-gray-900 font-medium px-3 py-1.5 hover:bg-gray-100 rounded-lg transition-colors'>
+								Use Local Mode
+							</button>
+							<button
+								onClick={handleSwitchToCloud}
+								className='text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 hover:bg-blue-50 rounded-lg transition-colors'>
+								Switch to Cloud
+							</button>
+							<button
+								onClick={handleExitToLanding}
+								className='text-sm text-gray-500 hover:text-gray-700 font-medium px-3 py-1.5 hover:bg-gray-100 rounded-lg transition-colors'>
+								Go to Landing
+							</button>
+						</div>
 					</div>
 				)}
 
@@ -419,6 +538,7 @@ export default function TrackerPage() {
 							storageService.resetHistory();
 							setHistory({});
 							setSecondsToday(0);
+							setHasLocalData(false);
 						}
 					}}
 				/>
