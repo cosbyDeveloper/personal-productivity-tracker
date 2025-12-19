@@ -26,6 +26,6 @@ A Personal Web App for tracking productive hours with smart daily targets.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/productivity-tracker.git
+   git clone https://github.com/yourusername/personal-productivity-tracker.git
    cd time-tracker
    ```
