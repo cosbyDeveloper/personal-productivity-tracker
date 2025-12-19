@@ -21,9 +21,21 @@ export default function SignInPage() {
 	const [password, setPassword] = useState('');
 
 	useEffect(() => {
+		// Store callback URL from query params (passed by NextAuth)
+		const searchParams = new URLSearchParams(window.location.search);
+		const callbackUrl = searchParams.get('callbackUrl');
+
+		if (callbackUrl) {
+			sessionStorage.setItem('auth-callback-url', callbackUrl);
+		}
+
 		getSession().then((session) => {
 			if (session) {
-				router.push('/');
+				// Redirect to callback URL or default to /tracker
+				const callbackUrl =
+					sessionStorage.getItem('auth-callback-url') || '/tracker';
+				sessionStorage.removeItem('auth-callback-url');
+				router.push(callbackUrl);
 			}
 		});
 	}, [router]);
@@ -42,7 +54,24 @@ export default function SignInPage() {
 			if (result?.error) {
 				alert('Invalid credentials. Please try again.');
 			} else {
-				router.push('/');
+				// Clear local storage mode
+				document.cookie =
+					'local-storage-mode=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+
+				// Get callback URL from sessionStorage or use default
+				const callbackUrl =
+					sessionStorage.getItem('auth-callback-url') || '/tracker';
+				sessionStorage.removeItem('auth-callback-url');
+
+				// Add cache-busting parameter
+				const finalUrl =
+					callbackUrl +
+					(callbackUrl.includes('?') ? '&' : '?') +
+					'auth=email&ts=' +
+					Date.now();
+
+				// Redirect to the callback URL
+				router.push(finalUrl);
 				router.refresh();
 			}
 		} catch (error) {
@@ -53,8 +82,28 @@ export default function SignInPage() {
 		}
 	};
 
+	const handleGoogleSignIn = () => {
+		// Get callback URL from sessionStorage or use default
+		const callbackUrl =
+			sessionStorage.getItem('auth-callback-url') ||
+			`${window.location.origin}/tracker`;
+		sessionStorage.removeItem('auth-callback-url');
+
+		// Clear local storage mode
+		document.cookie =
+			'local-storage-mode=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+
+		signIn('google', {
+			callbackUrl:
+				callbackUrl +
+				(callbackUrl.includes('?') ? '&' : '?') +
+				'auth=google&ts=' +
+				Date.now(),
+		});
+	};
+
 	return (
-		<div className='min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4'>
+		<div className='min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 p-4'>
 			<Card className='w-full max-w-md shadow-xl'>
 				<CardHeader className='space-y-1'>
 					<CardTitle className='text-2xl font-bold text-center'>
@@ -111,7 +160,7 @@ export default function SignInPage() {
 
 						<div className='mt-6'>
 							<Button
-								onClick={() => signIn('google', { callbackUrl: '/' })}
+								onClick={handleGoogleSignIn}
 								variant='outline'
 								className='w-full'
 								disabled={isLoading}>

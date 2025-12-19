@@ -6,6 +6,10 @@ import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { getMongoClient } from '@/lib/mongodb';
+import { getNextAuthSecret } from '@/lib/nextauth-utils';
+
+// Get the properly formatted secret
+const nextAuthSecret = getNextAuthSecret();
 
 export const authOptions: NextAuthOptions = {
 	adapter: MongoDBAdapter(getMongoClient()),
@@ -79,12 +83,24 @@ export const authOptions: NextAuthOptions = {
 		strategy: 'jwt',
 		maxAge: 24 * 60 * 60, // 1 day
 	},
-	secret: process.env.NEXTAUTH_SECRET,
+	// CRITICAL: Pass the bytes, not the hex string
+	jwt: {
+		secret:
+			typeof nextAuthSecret === 'string'
+				? nextAuthSecret
+				: Buffer.from(nextAuthSecret).toString('utf-8'),
+		maxAge: 60 * 60 * 24 * 30, // 30 days
+	},
+	secret:
+		typeof nextAuthSecret === 'string'
+			? nextAuthSecret
+			: Buffer.from(nextAuthSecret).toString('utf-8'),
 	debug: process.env.NODE_ENV === 'development',
 	callbacks: {
 		async jwt({ token, user }) {
 			if (user) {
 				token.id = user.id;
+				token.email = user.email;
 			}
 			return token;
 		},
@@ -100,7 +116,6 @@ export const authOptions: NextAuthOptions = {
 		signIn: '/auth/signin',
 		signOut: '/auth/signout',
 	},
-	// Use secure cookies in production
 	cookies: {
 		sessionToken: {
 			name: `next-auth.session-token`,

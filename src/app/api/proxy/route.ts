@@ -1,19 +1,55 @@
+// src/app/api/proxy/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
-export async function middleware(request: NextRequest) {
-	const token = await getToken({
-		req: request,
-		secret: process.env.NEXTAUTH_SECRET,
-	});
+// Helper function to get JWT secret
+function getJWTSecret() {
+	const secret = process.env.NEXTAUTH_SECRET;
+	return secret;
+}
+
+export async function GET(request: NextRequest) {
+	return handleRequest(request);
+}
+
+export async function POST(request: NextRequest) {
+	return handleRequest(request);
+}
+
+export async function PUT(request: NextRequest) {
+	return handleRequest(request);
+}
+
+export async function DELETE(request: NextRequest) {
+	return handleRequest(request);
+}
+
+export async function PATCH(request: NextRequest) {
+	return handleRequest(request);
+}
+
+async function handleRequest(request: NextRequest) {
+	let token = null;
+
+	try {
+		// Try to get token with correct secret format
+		token = await getToken({
+			req: request,
+			secret: getJWTSecret(), // Use converted secret
+		});
+	} catch (error) {
+		console.error('Token decoding failed:', error);
+		// Continue without token - user will be treated as unauthenticated
+	}
 
 	const url = request.nextUrl.clone();
 	const searchParams = request.nextUrl.searchParams;
 
 	// Debug logging - enhanced
-	console.log('=== MIDDLEWARE LOG ===');
+	console.log('=== PROXY LOG ===');
 	console.log('Path:', request.nextUrl.pathname);
 	console.log('Has Auth Token:', !!token);
+	console.log('Token decoding error:', token === null);
 	console.log('useLocalStorage param:', searchParams.get('useLocalStorage'));
 	console.log(
 		'All Cookies:',
@@ -64,7 +100,8 @@ export async function middleware(request: NextRequest) {
 			response.cookies.set('local-storage-mode', 'true', {
 				maxAge: 60 * 60 * 24 * 30,
 				path: '/',
-				httpOnly: true,
+				sameSite: 'lax',
+				secure: process.env.NODE_ENV === 'production',
 			});
 			return response;
 		}
@@ -110,7 +147,3 @@ export async function middleware(request: NextRequest) {
 
 	return NextResponse.next();
 }
-
-export const config = {
-	matcher: ['/', '/tracker', '/api/((?!auth).*)'],
-};

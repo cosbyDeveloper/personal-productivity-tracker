@@ -4,9 +4,8 @@ import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 
 export default function LandingPage() {
-	// Simple landing page - middleware handles all redirect logic
 	return (
-		<div className='min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4'>
+		<div className='min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 p-4'>
 			<div className='max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8'>
 				<div className='text-center'>
 					<div className='w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6'>
@@ -57,7 +56,9 @@ export default function LandingPage() {
 									document.cookie =
 										'local-storage-mode=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 									signIn('google', {
-										callbackUrl: `${window.location.origin}/tracker`,
+										callbackUrl: `${
+											window.location.origin
+										}/tracker?auth=google&ts=${Date.now()}`,
 									});
 								}}
 								className='w-full mt-3 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-3'>

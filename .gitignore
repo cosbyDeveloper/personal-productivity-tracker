@@ -42,3 +42,12 @@ next-env.d.ts
 
 # Some Pages
 /src/app/test-auth/
+/src/app/api/auth/debug/
+/src/app/api/auth/debug-token/
+/src/app/api/auth/env-check/
+/src/app/api/auth/test-crypto/
+/src/app/api/auth/test-jose/
+/src/app/api/auth/test-secret/
+/src/app/api/auth/validate/
+/src/app/api/auth/validate-secret/
+/src/app/api/auth/verify-secret/
